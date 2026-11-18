@@ -1,0 +1,78 @@
+{
+  "name": "@nandoblanco/opencode-local-tokens",
+  "version": "0.1.0",
+  "description": "Local token analytics and model-aware session handoff for OpenCode V2.",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tokens",
+    "usage",
+    "quotas",
+    "analytics",
+    "sqlite",
+    "bm25",
+    "tui",
+    "opentui"
+  ],
+  "license": "MIT",
+  "author": "Fernando Blanco",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nandoblanco/opencode-local-tokens"
+  },
+  "type": "module",
+  "bin": {
+    "opencode-tokens": "./cli.js"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./tui": "./src/tui.ts",
+    "./rpc": "./src/rpc.ts",
+    "./gui-experimental": "./dist/gui-experimental.cjs",
+    "./tokens": "./src/tokens.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cli.js",
+    "src/",
+    "dist/gui-experimental.cjs",
+    "README.md",
+    "CHANGELOG.md",
+    "HANDOFF-MEASUREMENT.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:gui": "vite build",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@opencode/plugin": "^2.2.5"
+  },
+  "peerDependencies": {
+    "@opentui/core": "*",
+    "@opentui/solid": "*",
+    "solid-js": "*"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@opencode/theme": "^2.2.5",
+    "solid-js": "^1.9.18",
+    "vite": "^8.3.5",
+    "vite-plugin-solid": "^2.11.15"
+  }
+}
