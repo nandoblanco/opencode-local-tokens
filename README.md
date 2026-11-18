@@ -1,10 +1,14 @@
 # @nandoblanco/opencode-local-tokens
 
-**Local token analytics and model-aware session handoff for OpenCode V2**, with searchable sessions, structured working state, bounded history retrieval, and local handoff measurements.
+**Local token auditing and model-aware session handoff for OpenCode V2**, built to find which projects consume the most tokens by project folder or tag. Compare token totals, drill into individual sessions, and separate input, output, reasoning, and cache activity. Search, sorting, and manual tags help trace the largest totals back to the work behind them.
+
+Handoff connects that audit to the next step: continuing work when a conversation has grown large or is nearing the model's context limit. Token totals show where tokens went; context status shows how much of the current model's capacity the latest request used. When you choose to move to a fresh session, handoff carries forward a structured checkpoint of the goal, decisions, constraints, unfinished work, and next action, with bounded retrieval from linked predecessor sessions instead of requiring the entire transcript up front. The aim is to preserve useful working context without carrying every old exchange into the new conversation. Handoff is manual, preparation uses model tokens, and lower token costs are not guaranteed.
 
 ## Background
 
-Tokens owns local session analysis and continuity. Account balances and subscription quotas belong to the separately installed Usage package. Tokens does not import Usage, load its account configuration, call quota APIs, or register `/usage`.
+Tokens started with a practical question: which projects are consuming the most tokens, and what work is driving those totals? Session-by-session counters make that hard to see when work spans multiple conversations or folders.
+
+Tokens reads local session records and transcripts to make that audit easier. Use project folders to narrow the work being reviewed, or tag related sessions across folders to track a client, feature, or type of task. Sort sessions by token count to find the largest contributors, then inspect their token breakdowns. Desktop's `Per Tag` view brings tagged sessions together for a grouped comparison.
 
 ## Features
 
@@ -27,7 +31,7 @@ opencode plugin add @nandoblanco/opencode-local-tokens
 
 For local development, register this package's local directory. Entrypoints are `./server`, `./tui`, and `./gui-experimental`. Build the GUI bundle after GUI source changes. Package publication and live host loading are separate checks. Source execution requires a Node version with TypeScript execution support or equivalent tooling; the declared Node 22.5 minimum alone is insufficient for running these `.ts` entrypoints directly.
 
-## Usage
+## Using Tokens
 
 ### Automatic behavior
 
@@ -93,11 +97,11 @@ The analytics engine reads local session records and transcripts. It groups toke
 
 ### 2. Separate persistence (`mutateSessionTag`)
 
-Likes, tags, and notes use `session-tags.json`. `.tokens-turns-cache.json` caches searchable turn data and can contain session text. These files are local and should remain private. They are not account quota caches.
+Likes, tags, and notes use `session-tags.json`. `.tokens-turns-cache.json` caches searchable turn data and can contain session text. These files are local and should remain private.
 
 ### 3. Model capacity (`getSessionStepStatus`)
 
-Live context is input + cache read + cache write from the latest usage record. RPC status resolves the exact configured model key. Cumulative API-step and uncached-input counters do not drive the 75%/90% context alerts. Unknown capacity is reported as unknown, not guessed from a model name.
+Live context is input + cache read + cache write from the latest token record. RPC status resolves the exact configured model key. Cumulative API-step and uncached-input counters do not drive the 75%/90% context alerts. Unknown capacity is reported as unknown, not guessed from a model name.
 
 ### 4. Working state and evidence (`handoff.ts`)
 
@@ -105,7 +109,7 @@ Live context is input + cache read + cache write from the latest usage record. R
 
 ### 5. UI isolation (`gui.tsx`, `gui.css`, and `tui.ts`)
 
-Tokens uses its own plugin/RPC ID, panel IDs, commands, and `.olt-scope` stylesheet boundary. Usage can be loaded independently or alongside it. Desktop surfaces require CSS `@scope` support in the host webview.
+Tokens uses its own plugin/RPC ID, panel IDs, commands, and `.olt-scope` stylesheet boundary. Desktop surfaces require CSS `@scope` support in the host webview.
 
 ### 6. Agent tools (`server.ts`)
 
@@ -164,11 +168,11 @@ node test/handoff-browser.mjs
 node test/tui-browser.mjs
 ```
 
-Tests cover bounded history, working-state persistence, measurements, model-capacity lookup, and RPC separation. Workspace integration fixtures retain analytics and transcript parsing coverage. Browser fixtures run real GUI code against stubbed host APIs. They do not establish live Desktop/TUI behavior, authenticated quota access, or live idle-event collection. No measured cost/quality improvement is claimed.
+Tests cover bounded history, working-state persistence, measurements, model-capacity lookup, and RPC separation. Workspace integration fixtures retain analytics and transcript parsing coverage. Browser fixtures run real GUI code against stubbed host APIs. They do not establish live Desktop/TUI behavior or live idle-event collection. No measured cost/quality improvement is claimed.
 
 `tokens-controls.test.ts` verifies all eight sorts, ordering before limits, shell argument handling, and real SQLite/sidecar tag persistence. `tui-browser.mjs` exercises the real terminal dialog component through a DOM renderer adapter at 1280 and 800 pixels, with stubbed analytics and host APIs. Its screenshots verify browser-adapter layout and keyboard flows, not native OpenTUI cell layout or host shortcut dispatch.
 
-Tokens is verified independently of Usage. The standalone unit suite and browser fixtures above define this package's verification scope; no Usage source checkout or combined panel test is required.
+The standalone unit suite and browser fixtures above define this package's verification scope.
 
 ## License
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expanded the README introduction and background around auditing token totals by project folder or tag; removed references to the separate account-quota plugin from the README.
+- Explained how manual session handoff complements token auditing and model-context status, preserving structured working state and linked history when continuing in a fresh session without promising token savings.
+
 - Removed the obsolete combined Tokens/Usage browser fixtures and their README reference. Standalone Tokens tests remain the package's verification scope.
 
 - Disabled prompt-cache expiry banners and their countdown clocks by default in terminal and Desktop. Set plugin option `cacheAlerts: true` to opt in; manual handoff, context status, and token analytics are unchanged. Rebuilt the Desktop GUI bundle.
