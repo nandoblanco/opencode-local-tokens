@@ -1,4 +1,4 @@
-# @nandoblanco/opencode-local-tokens
+# opencode-local-tokens
 
 **Local token auditing and model-aware session handoff for OpenCode V2**, built to find which projects consume the most tokens by project folder or tag. Compare token totals, drill into individual sessions, and separate input, output, reasoning, and cache activity. Search, sorting, and manual tags help trace the largest totals back to the work behind them.
 
