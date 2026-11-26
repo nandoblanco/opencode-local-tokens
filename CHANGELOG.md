@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-11-26)
+
+- Removed eager startup `prewarmTokensCache()` timers from `src/server.ts` and `src/tui.ts` so OpenCode server and TUI startup are not blocked by synchronous SQLite scans on large `opencode.db` files; `/tokens` still prewarms and caches on demand when opened.
+- Fixed every session being labeled project `general`: the header summary created sidecar entries without running project inference, and the report never recomputed them. Entries now carry a `projectVersion` (including a hash of `tokens.json`) so existing sessions are relabeled automatically whenever the rules change (`src/summary.ts`, `src/tokens.ts`).
+- New `~/.config/opencode/tokens.json` (or `OPENCODE_TOKENS_CONFIG`) with `ignoreFolders` and `keywords`. Project is now every folder of the session directory minus ignored folder names and the home folder prefix (e.g. `/workspace/git/agency/clients/acme/storefront` -> `acme/storefront`); when nothing is left it is `general` (`src/tokens.ts`).
+- Removed all built-in project and tag keyword rules. Automatic tags now come only from the configured `keywords` map (tag -> list of words matched in the title and first prompts) plus `#claude-code` / `#codex-cli` source tags; keywords never change the project. The unused `projectRules` / `tagRules` options were replaced by `config` / `configPath` (`src/tokens.ts`, `test/tokens-controls.test.ts`).
+- Fixed mislabeled counts: header KPI and summary values are user turns, now labeled `Turns`; the summary line is prefixed `All time:` so it no longer appears to contradict the 30-day header; the session detail card shows `Steps / Turns` instead of the turn count labeled as steps (`src/gui.tsx`, `src/tui.ts`).
+- Tag chips show billed tokens like project chips instead of session counts.
+- Token totals of one billion or more format as `B` (e.g. `4.39B` instead of `4353.97M`) (`src/tokens.ts`).
+- Desktop panel now uses a container query: list and detail sit side by side at 640px and wider, and below that the list fills the panel and a row opens the detail with a `Back` button (Escape returns to the list) (`src/gui.css`).
+- TUI `/tokens` lists 80 sessions instead of 14 and tag chips no longer wrap mid-token.
+- TUI `/tokens` header now uses the same single-row title and key-hint layout as `/search`, `/memory` and `/backups`; model and project rows stay on one line, top tags list as aligned rows, table values are no longer truncated, and the dialog fits a 32-row terminal (`src/tui.ts`).
+- Desktop dialog fills its height, the duplicate `Token Audit` heading inside it now reads `Totals`, and the `Add tag` input is larger and easier to see (`src/gui.tsx`, `src/gui.css`).
+- Desktop arrow-key navigation scrolls the selected session into view.
+- Desktop `Like`, `Open Session` and `Filter Per Session` buttons use valid button variants, and the empty per-tag view explains that only the loaded sessions are searched and points to `Filter Per Session`.
 
 - Expanded the README introduction and background around auditing token totals by project folder or tag; removed references to the separate account-quota plugin from the README.
 - Explained how manual session handoff complements token auditing and model-context status, preserving structured working state and linked history when continuing in a fresh session without promising token savings.

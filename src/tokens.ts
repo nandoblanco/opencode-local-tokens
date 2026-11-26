@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -39,7 +40,10 @@ export interface SidecarSessionEntry {
   tokens: TokenCounters & { turns: number; steps?: number; toolCalls?: number };
   timeUpdated: number;
   vector?: number[] | null;
+  projectVersion?: number | string;
 }
+
+const PROJECT_VERSION = 3;
 
 export interface SidecarData {
   version: number;
@@ -47,15 +51,9 @@ export interface SidecarData {
   sessions: Record<string, SidecarSessionEntry>;
 }
 
-export interface ProjectRule {
-  project: string;
-  pathPattern?: string;
-  textPattern?: string;
-}
-
-export interface TagRule {
-  tag: string;
-  pattern: string;
+export interface TokensConfig {
+  ignoreFolders?: string[];
+  keywords?: Record<string, string[]>;
 }
 
 export interface TokensFilterOptions {
@@ -71,8 +69,8 @@ export interface TokensFilterOptions {
   claudeDir?: string;
   codexDir?: string;
   includeExternalCli?: boolean;
-  projectRules?: ProjectRule[];
-  tagRules?: TagRule[];
+  config?: TokensConfig;
+  configPath?: string;
 }
 
 export interface MatchedSessionRow {
@@ -232,106 +230,41 @@ const GENERIC_TITLES = [
   /^Chat\b/i,
 ];
 
-const BUILTIN_PROJECT_RULES: Array<{ project: string; match: (dir: string, text: string) => boolean }> = [
-  {
-    project: "client-cms",
-    match: (dir, text) =>
-      dir.includes("client-cms") ||
-      /\b(cascade|vtl|velocity|globex|acme|portal|northstar|sow|tech[- ]spec)\b/i.test(text),
-  },
-  {
-    project: "pi-coding-agent",
-    match: (dir, text) => dir.includes("pi-mono") || /\b(pi-mono|pi agent|coding-agent)\b/i.test(text),
-  },
-  {
-    project: "aiproxy-providers",
-    match: (dir, text) =>
-      dir.includes("aiproxy") ||
-      /\b(aiproxy|dlab|bteam|annex|crof|nahcrof|litellm|routeway)\b/i.test(text),
-  },
-  {
-    project: "agent-memory-skills",
-    match: (dir, text) =>
-      dir.includes("agent/memory") ||
-      dir.includes("agent/skills") ||
-      dir.includes("opencode-plugins") ||
-      /\b(memory\.mjs|local-memory|local-backup|local-search|local-usage|skill|agents\.md|task-observer|global-rules)\b/i.test(
-        text
-      ),
-  },
-  {
-    project: "network-mobile",
-    match: (_dir, text) =>
-      /\b(verizon|visible|us mobile|t-mobile|mvno|qci|hotspot|2\.4\s*ghz|5\s*ghz|wifi|cellular|apn|pdanet|tetrd|pairvpn|dun)\b/i.test(
-        text
-      ),
-  },
-  {
-    project: "mamp-tools",
-    match: (dir, text) =>
-      dir.includes("workspace/tools") ||
-      /\b(screens\.mjs|fetch\.mjs|usage-popup|usage-check|tokens\.mjs|prune-screenshots)\b/i.test(text),
-  },
-  {
-    project: "opencode-setup",
-    match: (dir, text) =>
-      dir.includes(".config/opencode") ||
-      /\b(opencode|tui|cli\.json|keybind|status bar|footer|mcp|worktree|compaction)\b/i.test(text),
-  },
-  {
-    project: "xampp-php",
-    match: (dir, text) =>
-      dir.includes("xampp") || /\b(apache|httpd|xampp|php\.ini|mysql|mariadb|pdo)\b/i.test(text),
-  },
-  {
-    project: "frontend-research",
-    match: (_dir, text) =>
-      /\b(codepen|gsap|three\.js|webgl|shader|animation|landing page|awwwards|design-taste)\b/i.test(text),
-  },
-];
+const DEFAULT_TOKENS_CONFIG: Required<TokensConfig> = {
+  ignoreFolders: ["git", "repos", "code", "dev", "projects", "workspace", "tmp", "temp", "windows", "system32"],
+  keywords: {},
+};
 
-const BUILTIN_TAG_RULES: Array<[string, RegExp]> = [
-  ["cascade-cms", /\b(cascade|hannon hill|cascadeapi|structured data|data definition|page asset|block asset)\b/i],
-  ["velocity-vtl", /\b(velocity|\.vtl|#set|#foreach|\$_escapeTool|\$_XPathTool|\$_SerializerTool)\b/i],
-  ["playwright", /\b(playwright|screens\.mjs|fetch\.mjs|screenshot|headless|chromium|browser_navigate)\b/i],
-  ["accessibility", /\b(wcag|aria|screen reader|axe|focus trap|keyboard nav|contrast|landmark|alt text)\b/i],
-  ["css-layout", /\b(css|flexbox|grid|media query|responsive|hover|z-index|tailwind| overflow|viewport)\b/i],
-  ["opencode-config", /\b(opencode|cli\.json|opencode\.json|keybind|provider|model|tui|plugin|session_v2)\b/i],
-  ["mcp-tools", /\b(mcp|context7|exa|grep_app|websearch|webfetch)\b/i],
-  ["usage-tokens", /\b(token|quota|usage|billing|rate limit|cache_read|cache_write|cost|spend)\b/i],
-  ["memory-rag", /\b(memory|vector|embedding|minilm|xenova|checkpoint|recall|bm25|session-tags)\b/i],
-  ["skills-rules", /\b(skill|agents\.md|claude\.md|global-rules|css-rules|js-rules|html-accessibility)\b/i],
-  ["php", /\b(php|pdo|mysqli|\$_get|\$_post|xampp|apache)\b/i],
-  ["python", /\b(python|pip|venv|ruff|pypdf|pdfplumber|\.py\b)\b/i],
-  ["powershell", /\b(powershell|pwsh|\.ps1|get-childitem|invoke-restmethod)\b/i],
-  ["sql-supabase", /\b(sql|postgres|supabase|sqlite|rls|migration|select\s+|join\s+)\b/i],
-  ["git-workflow", /\b(git|commit|branch|worktree|merge|rebase|github|pull request)\b/i],
-  ["pdf-docs", /\b(pdf|markdown|tech spec|sow|statement of work|documentation)\b/i],
-  ["network-carrier", /\b(verizon|visible|us mobile|t-mobile|mvno|qci|throttl|hotspot|wifi|5g|lte|tethering)\b/i],
-  ["subagents", /\b(subagent|parallel|explore agent|general agent|background task)\b/i],
-  ["debugging", /\b(bug|error|fix|crash|broken|fails|stack trace|exception|timeout)\b/i],
-  ["refactoring", /\b(refactor|clean up|simplify|modular|extract|rename)\b/i],
-  ["testing", /\b(test|assert|unit test|regression|verify|spec\.ts|\.test\.ts)\b/i],
-  ["typescript", /\b(typescript|tsconfig|\.ts\b|\.tsx\b|interface\s+|type\s+)\b/i],
-];
+let cachedConfig: { path: string; mtimeMs: number; config: Required<TokensConfig> } | null = null;
 
-const GENERIC_WORKSPACE_NAMES = new Set([
-  "",
-  ".",
-  "root",
-  "home",
-  "users",
-  "user",
-  "workspace",
-  "projects",
-  "git",
-  "repos",
-  "code",
-  "dev",
-  "workspace",
-  "tmp",
-  "temp",
-]);
+export function resolveTokensConfigPath(customPath?: string): string {
+  if (customPath) return customPath;
+  if (process.env.OPENCODE_TOKENS_CONFIG) return process.env.OPENCODE_TOKENS_CONFIG;
+  return join(homedir(), ".config", "opencode", "tokens.json");
+}
+
+export function loadTokensConfig(configPath?: string): Required<TokensConfig> {
+  const path = resolveTokensConfigPath(configPath);
+  if (!existsSync(path)) return DEFAULT_TOKENS_CONFIG;
+  const mtimeMs = statSync(path).mtimeMs;
+  if (cachedConfig?.path === path && cachedConfig.mtimeMs === mtimeMs) return cachedConfig.config;
+  let raw: TokensConfig = {};
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch (err) {
+    console.error(`[tokens] Ignoring invalid ${path}: ${(err as Error).message}`);
+  }
+  const config = {
+    ignoreFolders: Array.isArray(raw.ignoreFolders) ? raw.ignoreFolders.map(String) : DEFAULT_TOKENS_CONFIG.ignoreFolders,
+    keywords: raw.keywords && typeof raw.keywords === "object" ? raw.keywords : {},
+  };
+  cachedConfig = { path, mtimeMs, config };
+  return config;
+}
+
+function projectVersionFor(config: Required<TokensConfig>): string {
+  return `${PROJECT_VERSION}:${createHash("sha1").update(JSON.stringify(config)).digest("hex").slice(0, 10)}`;
+}
 
 export function resolveDefaultDbPath(customPath?: string): string {
   if (customPath) return customPath;
@@ -367,6 +300,7 @@ export function totalTokensWithCache(t: TokenCounters): number {
 }
 
 export function fmtNum(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(2)}k`;
@@ -480,72 +414,35 @@ export function buildSmartTitle(rawTitle: string, firstUserPrompts: string[]): s
   return cleanTitle || "Untitled Session";
 }
 
-function deriveWorkspaceSlug(workspaceDir: string): string {
-  const norm = (workspaceDir || "").replace(/\\/g, "/").replace(/\/+$/, "");
-  if (!norm) return "";
-  const parts = norm.split("/").filter(Boolean);
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const seg = parts[i].toLowerCase().replace(/[^a-z0-9._-]/g, "");
-    if (seg && !seg.endsWith(":") && !GENERIC_WORKSPACE_NAMES.has(seg)) {
-      return seg;
-    }
-  }
-  return "";
+export function deriveProjectFromFolder(workspaceDir: string, ignoreFolders: string[] = loadTokensConfig().ignoreFolders): string {
+  const ignore = new Set(ignoreFolders.map((f) => f.toLowerCase()));
+  const home = homedir().replace(/\\/g, "/").toLowerCase();
+  let dir = (workspaceDir || "").replace(/\\/g, "/");
+  if (dir.toLowerCase() === home || dir.toLowerCase().startsWith(`${home}/`)) dir = dir.slice(home.length);
+  const parts = dir.split("/").filter((p) => p && p !== "." && !p.endsWith(":") && !ignore.has(p.toLowerCase()));
+  return parts.join("/") || "general";
 }
 
 export function inferProjectAndTags(
   workspaceDir: string,
   smartTitle: string,
   userTexts: string[],
-  toolNames: string[],
-  customProjectRules?: ProjectRule[],
-  customTagRules?: TagRule[]
+  config: Required<TokensConfig> = loadTokensConfig()
 ): { project: string; autoTags: string[] } {
-  const dir = (workspaceDir || "").replace(/\\/g, "/").toLowerCase();
-  const combined = `${smartTitle}\n${userTexts.slice(0, 8).join("\n")}`.toLowerCase();
-
-  let project = "";
-
-  if (customProjectRules?.length) {
-    for (const rule of customProjectRules) {
-      const pathOk = rule.pathPattern ? new RegExp(rule.pathPattern, "i").test(dir) : false;
-      const textOk = rule.textPattern ? new RegExp(rule.textPattern, "i").test(combined) : false;
-      if (pathOk || textOk) {
-        project = rule.project;
-        break;
-      }
-    }
-  }
-
-  if (!project) {
-    for (const rule of BUILTIN_PROJECT_RULES) {
-      if (rule.match(dir, combined)) {
-        project = rule.project;
-        break;
-      }
-    }
-  }
-
-  if (!project) {
-    project = deriveWorkspaceSlug(workspaceDir) || "general";
-  }
-
-  const tags = new Set<string>();
-  for (const [tag, regex] of BUILTIN_TAG_RULES) {
-    if (regex.test(combined)) tags.add(tag);
-  }
-  if (customTagRules?.length) {
-    for (const rule of customTagRules) {
-      try {
-        if (new RegExp(rule.pattern, "i").test(combined)) tags.add(rule.tag);
-      } catch {}
-    }
-  }
-  if (toolNames.includes("subagent")) tags.add("subagents");
-  if (toolNames.includes("skill")) tags.add("skills-rules");
-  if (toolNames.some((t) => t.startsWith("memory_"))) tags.add("memory-rag");
-
-  return { project, autoTags: [...tags].slice(0, 6) };
+  const project = deriveProjectFromFolder(workspaceDir, config.ignoreFolders);
+  const text = `${smartTitle}\n${userTexts.slice(0, 8).join("\n")}`.toLowerCase();
+  const tags = Object.entries(config.keywords)
+    .filter(([, words]) =>
+      (Array.isArray(words) ? words : [words]).some((w) => {
+        const word = String(w).trim().toLowerCase();
+        if (!word) return false;
+        const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`).test(text);
+      })
+    )
+    .map(([tag]) => tag.replace(/^#/, "").trim().toLowerCase())
+    .filter(Boolean);
+  return { project, autoTags: [...new Set(tags)] };
 }
 
 export function extractSessionDetails(
@@ -1521,6 +1418,10 @@ export function analyzeTokens(options: TokensFilterOptions = {}): TokensReport {
   const limit = options.limit && options.limit > 0 ? options.limit : 25;
 
   const sidecar = loadSidecar(options.sidecarPath);
+  const tokensConfig = options.config
+    ? { ...loadTokensConfig(options.configPath), ...options.config }
+    : loadTokensConfig(options.configPath);
+  const projectVersion = projectVersionFor(tokensConfig as Required<TokensConfig>);
   const nowMs = Date.now();
   let sessions: Array<any> = [];
   let db: DatabaseSync | null = null;
@@ -1612,7 +1513,12 @@ export function analyzeTokens(options: TokensFilterOptions = {}): TokensReport {
       const existing = sidecar.sessions[s.id];
       let entry = existing;
 
-      if (!existing || existing.timeUpdated !== s.time_updated || existing.tokens?.turns === undefined) {
+      if (
+        !existing ||
+        existing.timeUpdated !== s.time_updated ||
+        existing.tokens?.turns === undefined ||
+        existing.projectVersion !== projectVersion
+      ) {
         const details = loadDetailsForSession(s);
         const compactTurns = toCompactTurns(details.turns);
         memoryTurnCache.set(s.id, { timeUpdated: s.time_updated, turns: compactTurns });
@@ -1624,9 +1530,7 @@ export function analyzeTokens(options: TokensFilterOptions = {}): TokensReport {
           dirVal,
           smartTitle,
           details.userPrompts,
-          details.allTools,
-          options.projectRules,
-          options.tagRules
+          tokensConfig as Required<TokensConfig>
         );
         const mergedAutoTags = details.sourceTag
           ? [...new Set([details.sourceTag, ...autoTags])]
@@ -1634,7 +1538,8 @@ export function analyzeTokens(options: TokensFilterOptions = {}): TokensReport {
 
         entry = {
           smartTitle,
-          project: (existing as any)?.customProject || existing?.project || project,
+          project: (existing as any)?.customProject || project,
+          projectVersion,
           autoTags: mergedAutoTags,
           customTags: existing?.customTags || [],
           removedTags: existing?.removedTags || [],
@@ -2112,7 +2017,7 @@ export function getSessionStepStatus(
     const details = extractSessionDetails(msgs, sRow);
     const title = buildSmartTitle(sRow.title || "", details.userPrompts);
     const directory = sRow.directory || sRow.workspace_directory || sRow.root_directory || "";
-    const { project } = inferProjectAndTags(directory, title, details.userPrompts, details.allTools);
+    const { project } = inferProjectAndTags(directory, title, details.userPrompts);
     const steps = details.steps;
     const toolCalls = details.toolCalls;
     const prompts = details.turns.length;
@@ -2266,7 +2171,7 @@ export function buildSessionHandoff(
     const details = extractSessionDetails(msgs, sRow);
     const title = buildSmartTitle(sRow.title || "", details.userPrompts);
     const directory = sRow.directory || sRow.workspace_directory || sRow.root_directory || "";
-    const { project } = inferProjectAndTags(directory, title, details.userPrompts, details.allTools);
+    const { project } = inferProjectAndTags(directory, title, details.userPrompts);
     const steps = details.steps;
     const toolCalls = details.toolCalls;
     const prompts = details.turns.length;

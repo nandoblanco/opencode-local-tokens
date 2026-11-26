@@ -19,7 +19,6 @@ import {
   emptyTokens,
   getSessionStepStatus,
   mutateSessionTag,
-  prewarmTokensCache,
   type SessionStepStatus,
   type TokensReport,
 } from "./tokens.ts";
@@ -181,11 +180,6 @@ export const server: Plugin.Definition = {
         if (!measurements.signal.aborted) console.warn("[opencode-local-tokens] Measurement subscription unavailable.");
       }
     })();
-    setTimeout(() => {
-      try {
-        prewarmTokensCache();
-      } catch {}
-    }, 500);
 
     if (ctx?.rpc?.register) {
       await ctx.rpc.register(TokensRpc, {

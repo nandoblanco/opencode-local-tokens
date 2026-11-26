@@ -1,6 +1,6 @@
 {
   "name": "@nandoblanco/opencode-local-tokens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local token analytics and model-aware session handoff for OpenCode V2.",
   "keywords": [
     "opencode",

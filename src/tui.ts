@@ -1,6 +1,6 @@
 import type { TuiPluginContext } from "@opencode/plugin/tui";
 import { prepareHandoff } from "./prepare-handoff.ts";
-import { RGBA } from "@opentui/core";
+import { RGBA, TextAttributes } from "@opentui/core";
 import {
   createComponent,
   createElement,
@@ -374,7 +374,7 @@ function TokensDialog(props: {
         tag: parsed.tag,
         likedOnly: parsed.likedOnly,
         sort: sortMode(),
-        limit: 14,
+        limit: 80,
       });
     } catch {
       return null;
@@ -536,17 +536,21 @@ function TokensDialog(props: {
     el(
       "box",
       {
-        flexDirection: "column",
+        flexDirection: "row",
         justifyContent: "space-between",
+        alignItems: "center",
+        gap: 2,
         border: ["bottom"],
         borderColor: C.border,
-        paddingBottom: 1,
+        paddingBottom: 0,
+        flexShrink: 0,
+        width: "100%",
       },
-      el("text", { fg: C.accent }, "opencode / tokens"),
+      el("text", { fg: C.accent, wrapMode: "none", flexShrink: 0, attributes: TextAttributes.BOLD }, "opencode / tokens"),
       el(
         "text",
-        { fg: C.muted },
-        "[↑↓] select  [Enter] open  [Ctrl+L] like  [Ctrl+U] clear  [Esc] close"
+        { fg: C.muted, wrapMode: "none", flexShrink: 1, minWidth: 0, truncate: true },
+        "[↑↓] select  [Enter] open  [^L] like  [^U] clear  [Esc] close"
       )
     ),
     el(
@@ -590,8 +594,8 @@ function TokensDialog(props: {
       ),
       el(
         "text",
-        { fg: C.muted },
-        () => `Sort: ${TOKEN_SORT_LABELS[sortMode()]}  [Ctrl+S] sort  [Ctrl+T] add tags  [Ctrl+R] remove tags`
+        { fg: C.muted, wrapMode: "none", truncate: true },
+        () => `Sort: ${TOKEN_SORT_LABELS[sortMode()]} ^s   add tags ^t   remove tags ^r`
       ),
       el(
         "box",
@@ -605,7 +609,7 @@ function TokensDialog(props: {
               "text",
               { fg: C.good },
               () =>
-                `${r().totalSessionsMatched} sessions · ${r().totals.turns.toLocaleString()} steps · Billed: ${fmtNum(
+                `${r().totalSessionsMatched} sessions · ${r().totals.turns.toLocaleString()} turns · Billed: ${fmtNum(
                   billedTokens(r().totals)
                 )} · w/Cache: ${fmtNum(totalTokensWithCache(r().totals))}`
             ),
@@ -672,8 +676,8 @@ function TokensDialog(props: {
                 borderColor: C.border,
                 paddingLeft: 2,
                 paddingRight: 2,
-                paddingTop: 1,
-                paddingBottom: 1,
+                paddingTop: 0,
+                paddingBottom: 0,
               },
               el("text", { fg: C.purple }, "TOP MODELS (MATCHED SCOPE)"),
               createComponent(For, {
@@ -688,9 +692,10 @@ function TokensDialog(props: {
                     {
                       flexDirection: "row",
                       justifyContent: "space-between",
+                      gap: 1,
                     },
-                    el("text", { fg: C.text }, m.slice(0, 32)),
-                    el("text", { fg: C.cyan }, `${fmtNum(v.total)} (${pct}%) · ${v.turns} steps`)
+                    el("text", { fg: C.text, wrapMode: "none", flexShrink: 1, minWidth: 0, truncate: true }, m.slice(0, 32)),
+                    el("text", { fg: C.cyan, wrapMode: "none", flexShrink: 0 }, `${fmtNum(v.total)} ${pct}% · ${v.turns} steps`)
                   );
                 },
               })
@@ -706,8 +711,8 @@ function TokensDialog(props: {
                 borderColor: C.border,
                 paddingLeft: 2,
                 paddingRight: 2,
-                paddingTop: 1,
-                paddingBottom: 1,
+                paddingTop: 0,
+                paddingBottom: 0,
               },
               el("text", { fg: C.purple }, "TOP PROJECTS & TAGS"),
               createComponent(For, {
@@ -720,17 +725,24 @@ function TokensDialog(props: {
                     {
                       flexDirection: "row",
                       justifyContent: "space-between",
+                      gap: 1,
                     },
-                    el("text", { fg: C.text }, proj.slice(0, 24)),
-                    el("text", { fg: C.good }, `${fmtNum(v.billed)} (${v.sessions} sess / ${v.turns} steps)`)
+                    el("text", { fg: C.text, wrapMode: "none", flexShrink: 1, minWidth: 0, truncate: true }, proj.slice(0, 24)),
+                    el("text", { fg: C.good, wrapMode: "none", flexShrink: 0 }, `${fmtNum(v.billed)} · ${v.sessions} sess`)
                   ),
               }),
-              el("text", { fg: C.muted }, () =>
-                r()
-                  .topTags.slice(0, 5)
-                  .map(([t, v]) => `#${t}(${v.count})`)
-                  .join("  ")
-              )
+              createComponent(For, {
+                get each() {
+                  return r().topTags.slice(0, 4);
+                },
+                children: ([t, v]: [string, any]) =>
+                  el(
+                    "box",
+                    { flexDirection: "row", justifyContent: "space-between", gap: 1 },
+                    el("text", { fg: C.muted, wrapMode: "none", flexShrink: 1, minWidth: 0, truncate: true }, `#${t}`),
+                    el("text", { fg: C.muted, wrapMode: "none", flexShrink: 0 }, fmtNum(v.billed))
+                  ),
+              })
             )
           ),
       })
@@ -744,13 +756,13 @@ function TokensDialog(props: {
         borderColor: C.border,
         paddingLeft: 2,
         paddingRight: 2,
-        paddingTop: 1,
-        paddingBottom: 1,
+        paddingTop: 0,
+        paddingBottom: 0,
       },
       el(
         "box",
         { flexDirection: "row", border: ["bottom"], borderColor: C.border },
-        el("text", { fg: C.muted }, "   ID".padEnd(13) + "Project".padEnd(19) + "Billed".padStart(9) + "w/Cache".padStart(10) + "Steps".padStart(6) + "  Session Title & Tags")
+        el("text", { fg: C.muted, wrapMode: "none", truncate: true }, "   ID".padEnd(13) + "Project".padEnd(21) + "Billed".padStart(9) + "w/Cache".padStart(10) + "Steps".padStart(7) + "  Session Title & Tags")
       ),
       (() => {
         const VIEWPORT = 8;
@@ -781,16 +793,16 @@ function TokensDialog(props: {
                     : "";
                   const line =
                     `${s.liked ? "★ " : isSel ? "▸ " : "  "}${s.shortId.padEnd(11)}` +
-                    `${s.project.slice(0, 18).padEnd(19)}` +
+                    `${(s.project.length > 20 ? `…${s.project.slice(-19)}` : s.project).padEnd(21)}` +
                     `${fmtNum(billedTokens(s.tokens)).padStart(9)}` +
                     `${fmtNum(totalTokensWithCache(s.tokens)).padStart(10)}` +
-                    `${stepsStr.padStart(6)}` +
-                    `  ${s.smartTitle.slice(0, 44)}${tagsPreview}`;
+                    `${stepsStr.padStart(7)}`;
                   return el(
                     "box",
                     {
                       flexDirection: "row",
                       width: "100%",
+                      gap: 2,
                       get backgroundColor() {
                         return isSel ? C.selectedBg() : undefined;
                       },
@@ -800,12 +812,25 @@ function TokensDialog(props: {
                       "text",
                       {
                         wrapMode: "none",
-                        truncate: true,
+                        flexShrink: 0,
                         get fg() {
                           return isSel ? C.selectedText() : s.liked ? C.warn() : C.text();
                         },
                       },
                       line
+                    ),
+                    el(
+                      "text",
+                      {
+                        wrapMode: "none",
+                        flexShrink: 1,
+                        minWidth: 0,
+                        truncate: true,
+                        get fg() {
+                          return isSel ? C.selectedText() : s.liked ? C.warn() : C.text();
+                        },
+                      },
+                      `${s.smartTitle}${tagsPreview}`
                     )
                   );
                 }).concat(
@@ -829,11 +854,6 @@ export const tui = {
   id: "opencode-local-tokens",
   async setup(context: TuiPluginContext) {
     activeContext = context;
-    setTimeout(() => {
-      try {
-        prewarmTokensCache();
-      } catch {}
-    }, 500);
 
     const openTokensDialog = (initialInput = "") => {
       context.ui.dialog.show(

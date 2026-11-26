@@ -144,6 +144,7 @@ function TokensSurface(props: TokensSurfaceProps) {
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [summary, setSummary] = createSignal<{ local30d: TokenSummary; localAllTime: TokenSummary }>();
   const [range, setRange] = createSignal<"local30d" | "localAllTime">("local30d");
+  const [view, setView] = createSignal<"list" | "detail">("list");
   void getRpcClient(props.ctx).summary({}).then(setSummary).catch(error => {
     props.ctx.toast.show({ title: "Failed to load token totals", description: String(error), variant: "error" });
   });
@@ -364,14 +365,19 @@ function TokensSurface(props: TokensSurfaceProps) {
 
     {
       const rows = matchedSessions();
-      if (e.key === "ArrowDown" || (e.ctrlKey && e.key.toLowerCase() === "n")) {
+      if (e.key === "Escape" && view() === "detail") {
         e.preventDefault();
-        if (rows.length > 0) setSelectedIndex((i) => Math.min(rows.length - 1, i + 1));
+        e.stopPropagation();
+        setView("list");
         return;
       }
-      if (e.key === "ArrowUp" || (e.ctrlKey && e.key.toLowerCase() === "p")) {
+      const down = e.key === "ArrowDown" || (e.ctrlKey && e.key.toLowerCase() === "n");
+      const up = e.key === "ArrowUp" || (e.ctrlKey && e.key.toLowerCase() === "p");
+      if (down || up) {
         e.preventDefault();
-        if (rows.length > 0) setSelectedIndex((i) => Math.max(0, i - 1));
+        if (rows.length > 0) setSelectedIndex((i) => (down ? Math.min(rows.length - 1, i + 1) : Math.max(0, i - 1)));
+        const root = e.currentTarget as HTMLElement;
+        requestAnimationFrame(() => root.querySelector(".olu-session-row--selected")?.scrollIntoView({ block: "nearest" }));
         return;
       }
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -421,9 +427,9 @@ function TokensSurface(props: TokensSurfaceProps) {
     }
   }
   return (
-    <div class={`olt-scope olu-root olu-root--${props.variant}`} onKeyDown={handleKeyDown}>
-<div class="olu-top-bar"><strong>Token Audit</strong><div class="olu-segmented" role="group" aria-label="Token totals range"><button type="button" class="olu-segment" aria-pressed={range() === "local30d"} onClick={() => setRange("local30d")}>30 Days</button><button type="button" class="olu-segment" aria-pressed={range() === "localAllTime"} onClick={() => setRange("localAllTime")}>All-Time</button></div></div>
-<Show when={summary()}>{data => <div class="olu-kpi-row" aria-live="polite"><div class="olu-kpi-card"><span class="olu-kpi-label">Sessions</span><span class="olu-kpi-value">{data()[range()].sessions}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Steps</span><span class="olu-kpi-value">{data()[range()].turns}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Billed Tokens</span><span class="olu-kpi-value">{fmtCompact(data()[range()].billed)}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Total w/ Cache</span><span class="olu-kpi-value">{fmtCompact(data()[range()].withCache)}</span></div></div>}</Show>
+    <div class={`olt-scope olu-root olu-root--${props.variant}${view() === "detail" ? " is-detail" : ""}`} onKeyDown={handleKeyDown}>
+<div class="olu-top-bar"><strong>Totals</strong><div class="olu-segmented" role="group" aria-label="Token totals range"><button type="button" class="olu-segment" aria-pressed={range() === "local30d"} onClick={() => setRange("local30d")}>30 Days</button><button type="button" class="olu-segment" aria-pressed={range() === "localAllTime"} onClick={() => setRange("localAllTime")}>All-Time</button></div></div>
+<Show when={summary()}>{data => <div class="olu-kpi-row" aria-live="polite"><div class="olu-kpi-card"><span class="olu-kpi-label">Sessions</span><span class="olu-kpi-value">{data()[range()].sessions}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Turns</span><span class="olu-kpi-value">{data()[range()].turns.toLocaleString()}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Billed Tokens</span><span class="olu-kpi-value">{fmtCompact(data()[range()].billed)}</span></div><div class="olu-kpi-card"><span class="olu-kpi-label">Total w/ Cache</span><span class="olu-kpi-value">{fmtCompact(data()[range()].withCache)}</span></div></div>}</Show>
         <div class="olu-tokens-layout">
           <div class="olu-filter-bar">
             <div class="olu-filter-input">
@@ -494,7 +500,7 @@ function TokensSurface(props: TokensSurfaceProps) {
                         onClick={() => applyQuickTokenFilter(`#${tag}`)}
                       >
                         <span>#{tag}</span>
-                        <span>({info.count})</span>
+                        <span>({fmtCompact(info.billed)})</span>
                       </button>
                     )}
                   </For>
@@ -503,7 +509,7 @@ function TokensSurface(props: TokensSurfaceProps) {
                   <span class="olu-updated-label">
                     {loadingTokens()
                       ? "Filtering..."
-                      : `${r().totalSessionsMatched} sessions · ${r().totals.turns.toLocaleString()} steps · Billed: ${fmtCompact(
+                      : `All time: ${r().totalSessionsMatched} sessions · ${r().totals.turns.toLocaleString()} turns · Billed: ${fmtCompact(
                           billedTokens(r().totals)
                         )} · w/Cache: ${fmtCompact(totalTokensWithCache(r().totals))}`}
                   </span>
@@ -513,7 +519,10 @@ function TokensSurface(props: TokensSurfaceProps) {
                       role="tab"
                       aria-selected={lowerViewTab() === "sessions"}
                       class={`olu-segment ${lowerViewTab() === "sessions" ? "olu-segment--active" : ""}`}
-                      onClick={() => setLowerViewTab("sessions")}
+                      onClick={() => {
+                        setLowerViewTab("sessions");
+                        setView("list");
+                      }}
                     >
                       Per Session ({matchedSessions().length})
                     </button>
@@ -522,7 +531,10 @@ function TokensSurface(props: TokensSurfaceProps) {
                       role="tab"
                       aria-selected={lowerViewTab() === "tags"}
                       class={`olu-segment ${lowerViewTab() === "tags" ? "olu-segment--active" : ""}`}
-                      onClick={() => setLowerViewTab("tags")}
+                      onClick={() => {
+                        setLowerViewTab("tags");
+                        setView("list");
+                      }}
                     >
                       Per Tag ({tagRows().length})
                     </button>
@@ -556,7 +568,10 @@ function TokensSurface(props: TokensSurfaceProps) {
                                 class={`olu-session-row ${
                                   idx() === selectedTagIndex() ? "olu-session-row--selected" : ""
                                 }`}
-                                onClick={() => setSelectedTagIndex(idx())}
+                                onClick={() => {
+                                  setSelectedTagIndex(idx());
+                                  setView("detail");
+                                }}
                               >
                                 <div class="olu-session-top">
                                   <div class="olu-session-title-wrap">
@@ -594,6 +609,7 @@ function TokensSurface(props: TokensSurfaceProps) {
                       {(selTag) => (
                         <div class="olu-detail-pane">
                           <div class="olu-detail-header">
+                            <button type="button" class="olu-back" onClick={() => setView("list")}>← Back</button>
                             <div>
                               <h4 class="olu-detail-title">#{selTag().tag}</h4>
                               <div class="olu-detail-meta">
@@ -602,7 +618,7 @@ function TokensSurface(props: TokensSurfaceProps) {
                             </div>
                             <div class="olu-detail-actions">
                               <ui.Button
-                                variant="secondary"
+                                variant="neutral"
                                 size="small"
                                 onClick={() => {
                                   applyQuickTokenFilter(`#${selTag().tag}`);
@@ -645,7 +661,11 @@ function TokensSurface(props: TokensSurfaceProps) {
                             </span>
                             <Show
                               when={selectedTagSessions().length > 0}
-                              fallback={<div class="olu-empty">No loaded sessions for this tag.</div>}
+                              fallback={
+                                <div class="olu-empty">
+                                  None of the {matchedSessions().length} loaded sessions carry this tag. Use Filter Per Session to list all {selTag().info.count}.
+                                </div>
+                              }
                             >
                               <div class="olu-table-wrap">
                                 <table class="olu-table">
@@ -710,7 +730,10 @@ function TokensSurface(props: TokensSurfaceProps) {
                           class={`olu-session-row ${
                             idx() === selectedIndex() ? "olu-session-row--selected" : ""
                           }`}
-                          onClick={() => setSelectedIndex(idx())}
+                          onClick={() => {
+                            setSelectedIndex(idx());
+                            setView("detail");
+                          }}
                           onDblClick={() => openSession(s)}
                         >
                           <div class="olu-session-top">
@@ -754,6 +777,7 @@ function TokensSurface(props: TokensSurfaceProps) {
                   {(sel) => (
                     <div class="olu-detail-pane">
                       <div class="olu-detail-header">
+                        <button type="button" class="olu-back" onClick={() => setView("list")}>← Back</button>
                         <div>
                           <h4 class="olu-detail-title">{sel().smartTitle}</h4>
                           <div class="olu-detail-meta">
@@ -762,14 +786,14 @@ function TokensSurface(props: TokensSurfaceProps) {
                         </div>
                         <div class="olu-detail-actions">
                           <ui.Button
-                            variant="secondary"
+                            variant="neutral"
                             size="small"
                             onClick={() => void toggleLikeSession(sel())}
                           >
                             {sel().liked ? "★ Liked" : "☆ Like"}
                           </ui.Button>
                           <ui.Button
-                            variant="primary"
+                            variant="contrast"
                             size="small"
                             onClick={() => openSession(sel())}
                           >
@@ -792,10 +816,11 @@ function TokensSurface(props: TokensSurfaceProps) {
                           </span>
                         </div>
                         <div class="olu-kpi-card">
-                          <span class="olu-kpi-label">Steps</span>
+                          <span class="olu-kpi-label">Steps / Turns</span>
                           <span class="olu-kpi-value">
+                            {(sel().steps || 0).toLocaleString()} /{" "}
                             {sel().turnScoped
-                              ? `${sel().turns} / ${sel().totalSessionTurns}`
+                              ? `${sel().turns} of ${sel().totalSessionTurns}`
                               : sel().turns}
                           </span>
                         </div>

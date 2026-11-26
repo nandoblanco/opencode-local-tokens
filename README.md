@@ -15,7 +15,7 @@ Tokens reads local session records and transcripts to make that audit easier. Us
 | Feature | Details |
 | :--- | :--- |
 | Analytics | Input, output, reasoning, cache-read and cache-write counters; 30-day and all-time summaries |
-| Session search & sort | Topic search, inferred projects, model/tag filters, likes, notes, turn-scoped matching, and sorting (`Billed tokens`, `Total w/ cache`, `Steps`, `Recently updated`, `Newest created`, `Oldest created`, `Title A-Z`, `Relevance`) |
+| Session search & sort | Topic search, folder-based projects, configurable keyword tags, model/tag filters, likes, notes, turn-scoped matching, and sorting (`Billed tokens`, `Total w/ cache`, `Steps`, `Recently updated`, `Newest created`, `Oldest created`, `Title A-Z`, `Relevance`) |
 | Manual tagging & Per-Tag view | Terminal add/remove tag editor; Desktop `+ Tag` and removable `#tag ×` chips plus lower split-view tabs (`Per Session` and `Per Tag`) |
 | Local sources | OpenCode SQLite plus standalone Claude Code and Codex JSONL transcripts |
 | Context status | Latest recorded request compared with the exact configured model capacity; warning at 75%, high at 90% |
@@ -35,7 +35,7 @@ For local development, register this package's local directory. Entrypoints are 
 
 ### Automatic behavior
 
-`server.ts` registers a context reminder and two agent tools, prewarms local analytics, and observes `session.idle` for measurement updates. None of these creates a new session or changes compaction thresholds. Context alerts remain informational; unknown model capacity produces no guessed percentage.
+`server.ts` registers a context reminder and two agent tools, loads and caches local analytics on demand when `/tokens` is queried, and observes `session.idle` for measurement updates. None of these creates a new session or changes compaction thresholds. Context alerts remain informational; unknown model capacity produces no guessed percentage.
 
 Prompt-cache expiry banners and their countdown clocks are **off by default** in terminal and Desktop. Manual `/handoff`, context status, and token analytics remain available. To opt into the fixed five-minute cache estimate, set `cacheAlerts` to `true` in this plugin's options; it is an estimate, not a guarantee of the selected model's cache lifetime:
 
@@ -87,7 +87,7 @@ The terminal explorer keeps search, sort controls, and matched totals on separat
 | `Ctrl+U` | Clear search, or clear tag input while editing |
 | `Esc` | Cancel the open editor first; otherwise close the explorer |
 
-Sort choices are billed tokens, total with cache, steps, updated date, newest/oldest creation date, title, and relevance. The terminal starts with best match (billed tokens break ties). Sorting is applied across all matches before the 14-session terminal result limit. Removing an inferred tag suppresses it until explicitly added again. Edits show save errors without closing the editor or discarding typed tags.
+Sort choices are billed tokens, total with cache, steps, updated date, newest/oldest creation date, title, and relevance. The terminal starts with best match (billed tokens break ties). Sorting is applied across all matches before the 80-session terminal result limit. Removing a keyword tag suppresses it until explicitly added again. Edits show save errors without closing the editor or discarding typed tags.
 
 ## How It Works
 
@@ -141,8 +141,24 @@ Proposed, not implemented: preparation-start attribution, human outcome entry, a
 | Database | `OPENCODE_DB_PATH` | `~/.local/share/opencode/opencode.db` | Session source |
 | Tags sidecar | `OPENCODE_SESSION_TAGS` | `~/.local/share/opencode/session-tags.json` | Likes, tags, notes |
 | Handoff memory root | `OPENCODE_MEMORY_DIR` | `~/.opencode/memory` | `sessions/` exports and `handoffs/` working state and measurements |
+| Project and tag rules | `OPENCODE_TOKENS_CONFIG` | `~/.config/opencode/tokens.json` | `ignoreFolders` and `keywords` (see below) |
 
 Explicit function path arguments take precedence over these environment variables, which take precedence over home-directory defaults. Legacy machine-specific directories are no longer auto-detected. To keep using existing files elsewhere, set `OPENCODE_SESSION_TAGS` and `OPENCODE_MEMORY_DIR` to their current locations; no files are moved or migrated automatically. The measurement collector opens the source database read-only. Handoff Markdown and working-state files contain task information; measurement sidecars do not copy those bodies.
+
+### Projects and keyword tags (`tokens.json`)
+
+```json
+{
+  "ignoreFolders": ["workspace", "git", "agency", "clients"],
+  "keywords": {
+    "frontend": ["css", "flexbox", "layout"]
+  }
+}
+```
+
+- **Project** is every folder in the session directory except the drive, your home folder prefix, and any name in `ignoreFolders` (case-insensitive). With the example above, `/workspace/web-app` becomes `web-app` and `/workspace/git/agency/clients/acme/storefront` becomes `acme/storefront`. If every folder is ignored, the project is `general`. Without the file, `ignoreFolders` defaults to common names such as `git`, `repos`, `code`, `dev`, `projects`, `workspace`, `tmp`, `temp`, `Windows`, and `System32`.
+- **Keywords** add a tag when any listed word appears as a whole word in the session title or first prompts. Keywords never change the project. There are no built-in keyword tags; imported Claude Code and Codex CLI sessions still get `#claude-code` / `#codex-cli`.
+- Editing the file relabels every session on the next report; manual tags, removed tags, likes, and notes are kept.
 
 ## CLI Commands
 

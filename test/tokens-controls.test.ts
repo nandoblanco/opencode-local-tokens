@@ -4,7 +4,17 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { spawnSync } from "node:child_process";
 import { it } from "node:test";
-import { analyzeTokens, mutateSessionTag, sortTokenSessions, TOKEN_SORT_MODES, type MatchedSessionRow } from "../src/tokens.ts";
+import { analyzeTokens, deriveProjectFromFolder, inferProjectAndTags, mutateSessionTag, sortTokenSessions, TOKEN_SORT_MODES, type MatchedSessionRow } from "../src/tokens.ts";
+
+it("derives project from folders minus ignored names and tags only from configured keywords", () => {
+  const ignore = ["workspace", "git", "agency", "clients", "plugins"];
+  assert.equal(deriveProjectFromFolder("C:/workspace/web-app", ignore), "web-app");
+  assert.equal(deriveProjectFromFolder("C:\\workspace\\git\\plugins\\local-editor", ignore), "local-editor");
+  assert.equal(deriveProjectFromFolder("C:/workspace/git/agency/clients/acme/storefront", ignore), "acme/storefront");
+  assert.equal(deriveProjectFromFolder("C:/workspace", ignore), "general");
+  const inferred = inferProjectAndTags("C:/workspace/web-app", "Fix card grid", ["responsive layout"], { ignoreFolders: ignore, keywords: { frontend: ["grid", "layout"], css: ["flexbox"] } });
+  assert.deepEqual(inferred, { project: "web-app", autoTags: ["frontend"] });
+});
 
 it("sorts every supported mode with deterministic ties", () => {
   const rows = [
@@ -34,7 +44,7 @@ it("sorts before limiting and persists normalized tag additions, removals, and i
     db.prepare("INSERT INTO session_v2 VALUES (?, ?, ?, ?, ?)").run(id, `Repair ${i}`, root, i, i);
     db.prepare("INSERT INTO session_message VALUES (?, ?, ?, ?, ?)").run(`m${i}`, id, "assistant", i, JSON.stringify({ providerID: "fixture", modelID: "fixture", tokens: { input: (19 - i) * 100, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, content: [{ type: "text", text: "Repair complete" }] }));
   }
-  const options = { dbPath, sidecarPath, includeExternalCli: false, claudeDir: join(root, "claude"), codexDir: join(root, "codex"), tagRules: [{ tag: "repair", pattern: "repair" }] };
+  const options = { dbPath, sidecarPath, includeExternalCli: false, claudeDir: join(root, "claude"), codexDir: join(root, "codex"), configPath: join(root, "tokens.json"), config: { keywords: { repair: ["repair"] } } };
   try {
     const billed = analyzeTokens({ ...options, sort: "billed", limit: 14 });
     assert.equal(billed.sessions[0].id, "ses_controls_01");

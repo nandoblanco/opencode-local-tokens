@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { discoverExternalCliSessions, extractExternalSessionDetails, extractSessionDetails, loadSidecar, resolveDefaultDbPath, saveSidecar } from "./tokens.ts";
+import { deriveProjectFromFolder, discoverExternalCliSessions, extractExternalSessionDetails, extractSessionDetails, loadSidecar, resolveDefaultDbPath, saveSidecar } from "./tokens.ts";
 export interface TokenModelRow {
   model: string;
   turns: number;
@@ -80,6 +80,7 @@ export function fetchLocalTokenStats(
           existing = {
             smartTitle: existing?.smartTitle || ext.rawTitle || s.title || "CLI Session",
             project: existing?.project || "general",
+            projectVersion: existing?.projectVersion,
             autoTags: existing?.autoTags?.length ? existing.autoTags : [srcTag],
             customTags: existing?.customTags || [],
             liked: existing?.liked || false,
@@ -98,7 +99,8 @@ export function fetchLocalTokenStats(
           const details = extractSessionDetails(msgs, s);
           existing = {
             smartTitle: existing?.smartTitle || s.title || "Untitled Session",
-            project: existing?.project || "general",
+            project: existing?.project || deriveProjectFromFolder(s.directory),
+            projectVersion: existing?.projectVersion,
             autoTags: existing?.autoTags || [],
             customTags: existing?.customTags || [],
             liked: existing?.liked || false,
