@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-11-26)
+
+- Added `install` (`init` / `setup`) CLI subcommand (`installPlugin` in `cli.js`, tested in `test/install.test.ts`) writing a V2 entry to `opencode.jsonc` only, without requiring TypeScript execution.
+- Aligned `package.json` `"author"` to `"nandoblanco"` and standardized `README.md` Installation with all 4 install options (`opencode plugin add`, manual `opencode.jsonc`, `npx ... install`, and local directory) matching the other public OpenCode plugins.
+
 ## 0.1.1 (2026-11-26)
 
 - Removed eager startup `prewarmTokensCache()` timers from `src/server.ts` and `src/tui.ts` so OpenCode server and TUI startup are not blocked by synchronous SQLite scans on large `opencode.db` files; `/tokens` still prewarms and caches on demand when opened.

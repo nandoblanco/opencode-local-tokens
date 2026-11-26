@@ -23,13 +23,56 @@ Tokens reads local session records and transcripts to make that audit easier. Us
 
 ## Installation
 
-The bundled CLI has no `install` subcommand. Use OpenCode's plugin manager:
+### Option 1: OpenCode Plugin CLI (Recommended)
+
+Install with OpenCode's native plugin CLI. OpenCode downloads the package from npm (or GitHub) into its own cache automatically and adds one entry to `~/.config/opencode/opencode.jsonc` that loads the server tools, `/tokens` and `/handoff` TUI commands, and Desktop panel together:
 
 ```sh
 opencode plugin add @nandoblanco/opencode-local-tokens
+# Auto-update on startup and every 24 hours:
+opencode plugin add @nandoblanco/opencode-local-tokens@latest
+# Or install directly from GitHub:
+opencode plugin add github:nandoblanco/opencode-local-tokens
 ```
 
-For local development, register this package's local directory. Entrypoints are `./server`, `./tui`, and `./gui-experimental`. Build the GUI bundle after GUI source changes. Package publication and live host loading are separate checks. Source execution requires a Node version with TypeScript execution support or equivalent tooling; the declared Node 22.5 minimum alone is insufficient for running these `.ts` entrypoints directly.
+### Option 2: Manual Configuration
+
+Add `@nandoblanco/opencode-local-tokens` to `"plugins"` in the global `~/.config/opencode/opencode.jsonc` (or project `./opencode.jsonc` / `./.opencode/opencode.jsonc`). OpenCode fetches the npm package automatically and loads the server, TUI, and Desktop parts from this single entry (no manual `npm install` or separate `cli.json` entry is required):
+
+```jsonc
+{
+	"plugins": [
+		{
+			"package": "@nandoblanco/opencode-local-tokens",
+			"options": {
+				"cacheAlerts": false
+			}
+		}
+	]
+}
+```
+
+### Option 3: Built-in CLI Helper (`npx`)
+
+Run the package CLI once via `npx` to register the plugin in `~/.config/opencode/opencode.jsonc`:
+
+```sh
+npx @nandoblanco/opencode-local-tokens install
+# Or opt into prompt-cache alerts during setup:
+npx @nandoblanco/opencode-local-tokens install --cache-alerts
+```
+
+### Option 4: From a Local Directory
+
+Clone this repository, run `npm ci` and `npm run build:gui` after GUI source changes, then reference the package directory in `opencode.jsonc` (or place the directory inside `~/.config/opencode/plugins/` or `.opencode/plugins/`):
+
+```json
+{
+	"plugins": ["file:///path/to/opencode-local-tokens"]
+}
+```
+
+Entrypoints are `./server`, `./tui`, and `./gui-experimental`. Package publication and live host loading are separate checks. Source execution requires a Node version with TypeScript execution support or equivalent tooling; the declared Node 22.5 minimum alone is insufficient for running these `.ts` entrypoints directly (the `install` CLI subcommand runs in plain Node without loading TypeScript entrypoints).
 
 ## Using Tokens
 
