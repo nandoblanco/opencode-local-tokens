@@ -1,6 +1,6 @@
 {
   "name": "@nandoblanco/opencode-local-tokens",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publishConfig": {
     "access": "public"
   },
@@ -40,6 +40,8 @@
     "cli.js",
     "src/",
     "dist/gui-experimental.cjs",
+    "assets/screenshot.png",
+    "assets/screenshot-tui.png",
     "README.md",
     "CHANGELOG.md",
     "HANDOFF-MEASUREMENT.md",

@@ -2,6 +2,13 @@
 
 **Local token auditing and model-aware session handoff for OpenCode V2**, built to find which projects consume the most tokens by project folder or tag. Compare token totals, drill into individual sessions, and separate input, output, reasoning, and cache activity. Search, sorting, and manual tags help trace the largest totals back to the work behind them.
 
+| OpenCode Desktop | OpenCode TUI |
+| :---: | :---: |
+| [![opencode-local-tokens Desktop preview](./assets/screenshot.png)](./assets/screenshot.png) | [![opencode-local-tokens TUI preview](./assets/screenshot-tui.png)](./assets/screenshot-tui.png) |
+| [View full size](./assets/screenshot.png) | [View full size](./assets/screenshot-tui.png) |
+
+*Note: Previews were rendered in headless Chromium via Playwright from the plugin's actual Desktop (`dist/gui-experimental.cjs`) and TUI (`src/tui.ts`) UI code using synthetic fixture data and a simulated host frame, rather than captured from a live OpenCode window or terminal.*
+
 Handoff connects that audit to the next step: continuing work when a conversation has grown large or is nearing the model's context limit. Token totals show where tokens went; context status shows how much of the current model's capacity the latest request used. When you choose to move to a fresh session, handoff carries forward a structured checkpoint of the goal, decisions, constraints, unfinished work, and next action, with bounded retrieval from linked predecessor sessions instead of requiring the entire transcript up front. The aim is to preserve useful working context without carrying every old exchange into the new conversation. Handoff is manual, preparation uses model tokens, and lower token costs are not guaranteed.
 
 ## Background

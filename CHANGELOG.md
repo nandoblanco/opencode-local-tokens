@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2026-11-26)
+
+- Added OpenCode Desktop (`assets/screenshot.png`) and OpenCode TUI (`assets/screenshot-tui.png`) preview screenshots side by side with full-size links and a Playwright capture note in `README.md`, and packaged both in `package.json` `"files"`.
+
 ## 0.1.2 (2026-11-26)
 
 - Added `install` (`init` / `setup`) CLI subcommand (`installPlugin` in `cli.js`, tested in `test/install.test.ts`) writing a V2 entry to `opencode.jsonc` only, without requiring TypeScript execution.
